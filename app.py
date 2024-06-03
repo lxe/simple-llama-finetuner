@@ -210,6 +210,7 @@ class UI():
                 )
 
                 self.generate_btn = gr.Button('Generate', variant='primary')
+                self.cancel_btn = gr.Button('Cancel', variant='primary')
 
                 with gr.Row():
                     with gr.Column():
@@ -264,28 +265,37 @@ class UI():
             
             
             def generate(
-                prompt, 
-                do_sample, 
-                max_new_tokens, 
-                num_beams, 
-                repeat_penalty, 
-                temperature, 
+                prompt,
+                do_sample,
+                max_new_tokens,
+                num_beams,
+                repeat_penalty,
+                temperature,
                 top_p,
                 top_k,
                 progress=gr.Progress(track_tqdm=True)
             ):
-                return self.trainer.generate(
-                    prompt,
-                    do_sample=do_sample,
-                    max_new_tokens=max_new_tokens,
-                    num_beams=num_beams,
-                    repetition_penalty=repeat_penalty,
-                    temperature=temperature,
-                    top_p=top_p,
-                    top_k=top_k
-                )
+                #Iteratively generate tokens until we either emit max_new_tokens or stop getting new output           
+                for i in range(max_new_tokens):
+                    output_this_iteration = self.trainer.generate(
+                        prompt,
+                        do_sample=do_sample,
+                        max_new_tokens=1,
+                        num_beams=num_beams,
+                        repetition_penalty=repeat_penalty,
+                        temperature=temperature,
+                        top_p=top_p,
+                        top_k=top_k
+                    )
+                    #If we have the same output as last iteration, generation is done
+                    if len(prompt) == len(output_this_iteration):
+                        break
+                    
+                    prompt = output_this_iteration
+                    yield output_this_iteration
+                    
             
-            self.generate_btn.click(
+            generate_event = self.generate_btn.click(
                 fn=generate,
                 inputs=[
                     self.prompt,
@@ -299,6 +309,8 @@ class UI():
                 ],
                 outputs=[self.output]
             )
+
+            self.cancel_btn.click(fn=None, inputs=None, outputs=None, cancels=[generate_event])
 
     def layout(self):
         with gr.Blocks() as demo:
